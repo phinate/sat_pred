@@ -229,6 +229,60 @@ class Mid_Xnet(nn.Module):
 
         y = z.reshape(B, T, C, H, W)
         return y
+    
+
+class Mid_Xnet_Temporal(nn.Module):
+    
+    def __init__(self, channel_in, channel_hid, N_T, incep_ker = [3,5,7,11], groups=8):
+        super(Mid_Xnet_Temporal, self).__init__()
+
+        self.time_embedding = nn.Sequential(
+            nn.Linear(4, channel_hid),
+            nn.ReLU(),
+            nn.Linear(channel_hid, channel_hid),
+        )
+
+        self.N_T = N_T
+        enc_layers = [Inception(channel_in, channel_hid//2, channel_hid, incep_ker= incep_ker, groups=groups)]
+        for i in range(1, N_T-1):
+            enc_layers.append(Inception(channel_hid, channel_hid//2, channel_hid, incep_ker= incep_ker, groups=groups))
+        enc_layers.append(Inception(channel_hid, channel_hid//2, channel_hid, incep_ker= incep_ker, groups=groups))
+
+        dec_layers = [Inception(channel_hid, channel_hid//2, channel_hid, incep_ker= incep_ker, groups=groups)]
+        for i in range(1, N_T-1):
+            dec_layers.append(Inception(2*channel_hid, channel_hid//2, channel_hid, incep_ker= incep_ker, groups=groups))
+        dec_layers.append(Inception(2*channel_hid, channel_hid//2, channel_in, incep_ker= incep_ker, groups=groups))
+
+        self.enc = nn.Sequential(*enc_layers)
+        self.dec = nn.Sequential(*dec_layers)
+
+    def forward(self, x, time_features):
+        B, T, C, H, W = x.shape
+        x = x.reshape(B, T*C, H, W)
+
+        # time stuff
+        # (reminding myself that T = num history steps)
+        # initial size: [B, T, 4]
+        t = self.time_embedding(time_features)  # [B, T, hidden]
+        t = t.unsqueeze(-1).unsqueeze(-1)       # [B, T, hidden, 1, 1]
+        t = t.expand(-1, -1, -1, H, W)          # [B, T, hidden, H, W]
+        t = t.reshape(B, -1, H, W)              # [B, T*hidden, H, W]
+
+        # encoder
+        skips = []
+        z = x
+        for i in range(self.N_T):
+            z = self.enc[i](z + t)  # add time embedding to result
+            if i < self.N_T - 1:
+                skips.append(z)
+
+        # decoder
+        z = self.dec[0](z)
+        for i in range(1, self.N_T):
+            z = self.dec[i](torch.cat([z, skips[-i]], dim=1))
+
+        y = z.reshape(B, T, C, H, W)
+        return y
 
 
 
@@ -244,7 +298,7 @@ class SimVP(nn.Module):
         N_S=4,
         N_T=8, 
         incep_ker=[3,5,7,11], 
-        groups=8
+        groups=8,
     ):
         super(SimVP, self).__init__()
                 
@@ -274,6 +328,61 @@ class SimVP(nn.Module):
 
         z = embed.view(B, T, C_, H_, W_)
         hid = self.hid(z)
+        hid = hid.reshape(B*T, C_, H_, W_)
+
+        Y = self.dec(hid, skip)
+        Y = Y.reshape(B, T, C, H, W)
+        
+        Y = Y.permute(0,2,1,3,4)
+
+        # Remove padding
+        # Y = Y[..., :self.spatial_size[0]-pad_bottom, :self.spatial_size[1]-pad_right]
+        return Y
+    
+
+class SimVPTemporal(nn.Module):
+    def __init__(
+        self, 
+        num_channels, 
+        history_len, 
+        forecast_len, 
+        spatial_size=(279, 386), 
+        hid_S=16, 
+        hid_T=256, 
+        N_S=4,
+        N_T=8, 
+        incep_ker=[3,5,7,11], 
+        groups=8,
+    ):
+        super(SimVPTemporal, self).__init__()                
+        self.enc = Encoder(num_channels, hid_S, N_S)
+        self.hid = Mid_Xnet_Temporal(history_len*hid_S, hid_T, N_T, incep_ker, groups)
+        self.dec = Decoder(hid_S, num_channels, N_S)
+        self.spatial_size = spatial_size
+
+
+    def forward(self, features):
+ 
+        x_raw, time_features = features
+        
+        # Pad out to a multiple of downsample factor
+        #pad_top = pad_left = 0
+        #downsample_factor = (N_S // 2)*2
+        #pad_bottom = downsample_factor - (self.spatial_size[0] % downsample_factor)
+        #pad_right = downsample_factor - (self.spatial_size[1] % downsample_factor)
+        #x_raw = F.pad(x_raw, (pad_left, pad_right, pad_top, pad_bottom), mode='constant', value=0)
+
+        # (batch, channel, time, height, width) -> (batch, time, channel, height, width)
+        x = x_raw.permute(0,2,1,3,4)
+        
+        B, T, C, H, W = x_raw.shape
+        x = x_raw.reshape(B*T, C, H, W)
+
+        embed, skip = self.enc(x)
+        _, C_, H_, W_ = embed.shape
+
+        z = embed.view(B, T, C_, H_, W_)
+        hid = self.hid(z, time_features)
         hid = hid.reshape(B*T, C_, H_, W_)
 
         Y = self.dec(hid, skip)
