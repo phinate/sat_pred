@@ -88,7 +88,7 @@ def print_config(
 
 
 @hydra.main(config_path="../configs/", config_name="config.yaml", version_base="1.2")
-def train(config: DictConfig):
+def train(config: DictConfig, use_temporal_features = True):
     """Train the model using parameters in the supplied config files.
 
     Args:
@@ -101,14 +101,37 @@ def train(config: DictConfig):
     if "seed" in config:
         seed_everything(config.seed, workers=True)
     
-
-    if config.model.model.get("from_pretrained", False):
+    if use_temporal_features:
+        from sat_pred.models.simvp_model import SimVPTemporal
 
         # Load the model from the checkpoint
-        torch_model, model_config, data_config = get_model_from_checkpoints(
+        pretrained_model, model_config, _data_config = get_model_from_checkpoints(
             config.model.model.checkpoint_dir, 
             val_best=config.model.model.val_best
         )
+
+        del model_config["_target_"]
+
+        time_model = SimVPTemporal(**model_config)
+
+        for attr in ['enc', 'dec']:
+            pretrained_submodule = getattr(pretrained_model, attr)
+            time_submodule = getattr(time_model, attr)
+            time_submodule.load_state_dict(pretrained_submodule.state_dict())
+
+            pretrained_hid = getattr(pretrained_model._modules["hid"], attr) 
+            time_hid = getattr(time_model._modules["hid"], attr)
+            time_hid.load_state_dict(pretrained_hid.state_dict())
+
+        model_config["_target_"] = "sat_pred.models.simvp_model.SimVPTemporal"
+        model_config["optimizer"]["_target_"] = "sat_pred.optimizers.AdamWReduceLROnPlateauGroups"
+        model_config["optimizer"]["lr"] = 1e-5
+        model_config["optimizer"]["param_groups"] = [
+                {
+                    'params_pattern': ['time'],  # match params that contain 'time'
+                    'lr_multiplier': 10  # this group will use lr * 10
+                },
+            ]
 
         # Overwtie the model config with the loaded model config
         config.model.model = OmegaConf.create(model_config).model
@@ -117,12 +140,30 @@ def train(config: DictConfig):
         model: LightningModule = hydra.utils.instantiate(config.model)
 
         # Replace the untrained model with the loaded model
-        model.model = torch_model
-
+        model.model = time_model
 
     else:
-        # Instantiate the model
-        model: LightningModule = hydra.utils.instantiate(config.model)
+        if config.model.model.get("from_pretrained", False):
+
+            # Load the model from the checkpoint
+            torch_model, model_config, data_config = get_model_from_checkpoints(
+                config.model.model.checkpoint_dir, 
+                val_best=config.model.model.val_best
+            )
+
+            # Overwtie the model config with the loaded model config
+            config.model.model = OmegaConf.create(model_config).model
+
+            # Create a new lightning wrapped model
+            model: LightningModule = hydra.utils.instantiate(config.model)
+
+            # Replace the untrained model with the loaded model
+            model.model = torch_model
+
+
+        else:
+            # Instantiate the model
+            model: LightningModule = hydra.utils.instantiate(config.model)
 
     model.multi_gpu = len(config.trainer.devices) > 1
 

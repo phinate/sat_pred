@@ -15,8 +15,8 @@ sample_freq_mins: 15
 train_period: ["2008-01-01 00:00", "2015-12-31 23:55"] # [start, end]
 val_period: ["2016-01-01 00:00", "2016-12-31 23:55"]   # [start, end]
 num_workers: 8
-prefetch_factor: 2
-batch_size: 1
+prefetch_factor: 4
+batch_size: 16
 nan_to_num: true
-pin_memory: false
+pin_memory: true
 persistent_workers: true
