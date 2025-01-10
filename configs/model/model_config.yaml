@@ -1,0 +1,13 @@
+_target_: sat_pred.training_module.TrainingModule
+model:
+  _target_: sat_pred.models.simvp_model.SimVP
+  num_channels: 11
+  history_len: 12
+  forecast_len: 12
+  checkpoint_dir: /Users/phinate/code/sat_pred/checkpoint
+  val_best: False
+#  from_pretrained : True
+optimizer:
+  _target_: sat_pred.optimizers.AdamWReduceLROnPlateau
+  lr: 0.0005
+target_loss: MAE

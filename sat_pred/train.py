@@ -112,7 +112,11 @@ def train(config: DictConfig, use_temporal_features = True):
 
         del model_config["_target_"]
 
-        time_model = SimVPTemporal(**model_config)
+        time_model = SimVPTemporal(
+            num_channels = 11,
+            history_len = 12,
+            forecast_len = 12,
+        )
 
         for attr in ['enc', 'dec']:
             pretrained_submodule = getattr(pretrained_model, attr)
