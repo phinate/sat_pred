@@ -34,7 +34,7 @@ You can train a model by running
 python train.py
 ```
 
-from the root of the library. 
+from the root of the library.
 
 The model and training options used are defined in the config files. The most important parts of the config files you may wish to train are:
 
@@ -70,6 +70,3 @@ will train the model defined in `configs/model/earthformer.yaml` log ther traini
 [pypi-platforms]:           https://img.shields.io/pypi/pyversions/sat_pred
 [pypi-version]:             https://img.shields.io/pypi/v/sat_pred
 <!-- prettier-ignore-end -->
-
-
-
