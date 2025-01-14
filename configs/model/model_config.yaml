@@ -4,10 +4,13 @@ model:
   num_channels: 11
   history_len: 12
   forecast_len: 12
-  checkpoint_dir: /Users/phinate/code/sat_pred/checkpoint
+  checkpoint_dir: /bask/projects/v/vjgo8416-climate/users/gmmg6904/adding-time/sat_pred/checkpoint
   val_best: False
 #  from_pretrained : True
 optimizer:
-  _target_: sat_pred.optimizers.AdamWReduceLROnPlateau
-  lr: 0.0005
+  _target_: sat_pred.optimizers.AdamWReduceLROnPlateauGroups
+  lr: 0.00005
+  param_groups:
+      - params_pattern: ["time"]  # adjust patterns as needed
+        lr_multiplier: 10  # this group will use lr * 10
 target_loss: MAE

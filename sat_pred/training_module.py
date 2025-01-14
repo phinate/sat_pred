@@ -197,10 +197,11 @@ class TrainingModule(pl.LightningModule):
     def training_step(self, batch, batch_idx: int) -> None | torch.Tensor:
         """Run training step"""
         
-        X, y = batch
+        X, y, time_features = batch
         
-        y_hat = self.model(X)
+        y_hat = self.model(X, time_features)
         del X
+        del time_features
 
         losses = self._calculate_common_losses(y, y_hat)
         losses = {f"{k}/train": v for k, v in losses.items()}
@@ -227,9 +228,10 @@ class TrainingModule(pl.LightningModule):
     
     def validation_step(self, batch: dict, batch_idx: int):
         """Run validation step"""
-        X, y = batch
-        y_hat = self.model(X)
+        X, y, time_features = batch
+        y_hat = self.model(X, time_features)
         del X
+        del time_features
     
         losses = self._calculate_common_losses(y, y_hat)
         losses.update(self._calculate_val_losses(y, y_hat))
@@ -255,12 +257,12 @@ class TrainingModule(pl.LightningModule):
         if self.video_plot_t0_times is not None:
             dates = pd.to_datetime(list(self.video_plot_t0_times))
 
-            X, y = default_collate([val_dataset[date]for date in dates])
+            X, y, time_features = default_collate([val_dataset[date]for date in dates])
             X = X.to(self.device)
             y = y.to(self.device)
             
             with torch.no_grad():
-                y_hat = self.model(X)
+                y_hat = self.model(X, time_features)
 
             assert val_dataset.nan_to_num, val_dataset.nan_to_num
                                 
@@ -273,12 +275,12 @@ class TrainingModule(pl.LightningModule):
 
         if self.video_crop_plots is not None:
             dates = pd.to_datetime([x["date"] for x in self.video_crop_plots])
-            X, y = default_collate([val_dataset[date]for date in dates])
+            X, y, time_features = default_collate([val_dataset[date]for date in dates])
             X = X.to(self.device)
             y = y.to(self.device)
 
             with torch.no_grad():
-                y_hat = self.model(X)
+                y_hat = self.model(X, time_features)
 
             for n in range(len(self.video_crop_plots)):
 
@@ -297,7 +299,6 @@ class TrainingModule(pl.LightningModule):
                 upload_video(
                     y[n, ..., i_slice, j_slice], 
                     y_hat[n, ..., i_slice, j_slice],
-                    video_name, 
                     channel_nums=[channel_num]
                 )
 

@@ -233,13 +233,19 @@ class Mid_Xnet(nn.Module):
 
 class Mid_Xnet_Temporal(nn.Module):
     
-    def __init__(self, channel_in, channel_hid, N_T, incep_ker = [3,5,7,11], groups=8):
+    def __init__(self, channel_in, channel_hid, N_T, incep_ker = [3,5,7,11], groups=8, history_len=12):
         super(Mid_Xnet_Temporal, self).__init__()
 
+        self.channel_in = channel_in
+        self.channel_hid = channel_hid
+
+        print(f"{history_len=}")
+        print(f"{self.channel_in=}, {self.channel_hid=}")
+
         self.time_embedding = nn.Sequential(
-            nn.Linear(4, channel_hid),
+            nn.Linear(4, channel_in),
             nn.ReLU(),
-            nn.Linear(channel_hid, channel_hid),
+            nn.Linear(channel_in, channel_in//history_len),
         )
 
         self.N_T = N_T
@@ -258,21 +264,24 @@ class Mid_Xnet_Temporal(nn.Module):
 
     def forward(self, x, time_features):
         B, T, C, H, W = x.shape
-        x = x.reshape(B, T*C, H, W)
-
         # time stuff
         # (reminding myself that T = num history steps)
         # initial size: [B, T, 4]
-        t = self.time_embedding(time_features)  # [B, T, hidden]
-        t = t.unsqueeze(-1).unsqueeze(-1)       # [B, T, hidden, 1, 1]
-        t = t.expand(-1, -1, -1, H, W)          # [B, T, hidden, H, W]
-        t = t.reshape(B, -1, H, W)              # [B, T*hidden, H, W]
+        t = self.time_embedding(time_features)  # [B, T, encoder_C]
+        t = t.unsqueeze(-1).unsqueeze(-1)       # [B, T, encoder_C, 1, 1]
+        t = t.expand(-1, -1, -1, H, W)          # [B, T, encoder_C, H, W]
+
+        print(f"{self.channel_in=}, {self.channel_hid=}, {x.shape=}, {t.shape=}")
+
+        
+        z = x + t
+        z = z.reshape(B, T*C, H, W)
+
 
         # encoder
         skips = []
-        z = x
         for i in range(self.N_T):
-            z = self.enc[i](z + t)  # add time embedding to result
+            z = self.enc[i](z) # add time embedding to result
             if i < self.N_T - 1:
                 skips.append(z)
 
@@ -356,15 +365,12 @@ class SimVPTemporal(nn.Module):
     ):
         super(SimVPTemporal, self).__init__()                
         self.enc = Encoder(num_channels, hid_S, N_S)
-        self.hid = Mid_Xnet_Temporal(history_len*hid_S, hid_T, N_T, incep_ker, groups)
+        self.hid = Mid_Xnet_Temporal(history_len*hid_S, hid_T, N_T, incep_ker, groups, history_len)
         self.dec = Decoder(hid_S, num_channels, N_S)
         self.spatial_size = spatial_size
 
 
-    def forward(self, features):
- 
-        x_raw, time_features = features
-        
+    def forward(self, x_raw, time_features):        
         # Pad out to a multiple of downsample factor
         #pad_top = pad_left = 0
         #downsample_factor = (N_S // 2)*2
@@ -375,8 +381,10 @@ class SimVPTemporal(nn.Module):
         # (batch, channel, time, height, width) -> (batch, time, channel, height, width)
         x = x_raw.permute(0,2,1,3,4)
         
-        B, T, C, H, W = x_raw.shape
-        x = x_raw.reshape(B*T, C, H, W)
+        B, T, C, H, W = x.shape
+        x = x.reshape(B*T, C, H, W)
+
+        print(x.shape)
 
         embed, skip = self.enc(x)
         _, C_, H_, W_ = embed.shape

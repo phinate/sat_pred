@@ -28,6 +28,7 @@ from sat_pred.loss import LossFunction
 
 # TODO: is this line needed?
 torch.set_default_dtype(torch.float32)
+torch.set_float32_matmul_precision('medium')
 
 def resolve_loss_name(loss):
     """Return the desired metric to monitor based on the loss being used.
@@ -221,13 +222,14 @@ def train(config: DictConfig, use_temporal_features = True):
     datamodule: LightningDataModule = hydra.utils.instantiate(config.datamodule, _convert_='all')
     
     datamodule.zarr_path = list(datamodule.zarr_path)
-
+    from lightning.pytorch.plugins.environments import LightningEnvironment
     # Instantiate the trainer
     trainer: Trainer = hydra.utils.instantiate(
         config.trainer,
         logger=loggers,
         _convert_="partial",
         callbacks=callbacks,
+        plugins=[LightningEnvironment()],  # Add this line to override the default SLURM environment
     )
 
     # Train the model
