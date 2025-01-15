@@ -1,24 +1,23 @@
 _target_: cloudcasting.dataset.SatelliteDataModule
 zarr_path: 
-  - /bask/projects/v/vjgo8416-climate/shared/data/eumetsat/training/2008_training_nonhrv.zarr
-  # - /mnt/disks/sat_data/sat_data_all/2008_training_nonhrv.zarr
-  # - /mnt/disks/sat_data/sat_data_all/2009_training_nonhrv.zarr
-  # - /mnt/disks/sat_data/sat_data_all/2010_training_nonhrv.zarr
-  # - /mnt/disks/sat_data/sat_data_all/2011_training_nonhrv.zarr
-  # - /mnt/disks/sat_data/sat_data_all/2012_training_nonhrv.zarr
-  # - /mnt/disks/sat_data/sat_data_all/2013_training_nonhrv.zarr
-  # - /mnt/disks/sat_data/sat_data_all/2014_training_nonhrv.zarr
-  # - /mnt/disks/sat_data/sat_data_all/2015_training_nonhrv.zarr
+  # - /bask/projects/v/vjgo8416-climate/shared/data/eumetsat/training/2008_training_nonhrv.zarr
+  # - /bask/projects/v/vjgo8416-climate/shared/data/eumetsat/training/2009_training_nonhrv.zarr
+  # - /bask/projects/v/vjgo8416-climate/shared/data/eumetsat/training/2010_training_nonhrv.zarr
+  # - /bask/projects/v/vjgo8416-climate/shared/data/eumetsat/training/2011_training_nonhrv.zarr
+  # - /bask/projects/v/vjgo8416-climate/shared/data/eumetsat/training/2012_training_nonhrv.zarr
+  - /bask/projects/v/vjgo8416-climate/shared/data/eumetsat/training/2013_training_nonhrv.zarr
+  - /bask/projects/v/vjgo8416-climate/shared/data/eumetsat/training/2014_training_nonhrv.zarr
+  - /bask/projects/v/vjgo8416-climate/shared/data/eumetsat/training/2015_training_nonhrv.zarr
   - /bask/projects/v/vjgo8416-climate/shared/data/eumetsat/training/2016_training_nonhrv.zarr
 history_mins: 165
 forecast_mins: 180
 sample_freq_mins: 15
-train_period: ["2008-01-01 00:00", "2015-12-31 23:55"] # [start, end]
+train_period: ["2013-01-01 00:00", "2015-12-31 23:55"] # [start, end]
 val_period: ["2016-01-01 00:00", "2016-12-31 23:55"]   # [start, end]
-num_workers: 0
-prefetch_factor: null
-batch_size: 1
+num_workers: 16
+prefetch_factor: 4
+batch_size: 4
 nan_to_num: true
 pin_memory: true
-persistent_workers: false
+persistent_workers: true
 return_time_features: true

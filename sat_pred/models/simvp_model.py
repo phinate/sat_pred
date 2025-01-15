@@ -236,12 +236,6 @@ class Mid_Xnet_Temporal(nn.Module):
     def __init__(self, channel_in, channel_hid, N_T, incep_ker = [3,5,7,11], groups=8, history_len=12):
         super(Mid_Xnet_Temporal, self).__init__()
 
-        self.channel_in = channel_in
-        self.channel_hid = channel_hid
-
-        print(f"{history_len=}")
-        print(f"{self.channel_in=}, {self.channel_hid=}")
-
         self.time_embedding = nn.Sequential(
             nn.Linear(4, channel_in),
             nn.ReLU(),
@@ -270,9 +264,6 @@ class Mid_Xnet_Temporal(nn.Module):
         t = self.time_embedding(time_features)  # [B, T, encoder_C]
         t = t.unsqueeze(-1).unsqueeze(-1)       # [B, T, encoder_C, 1, 1]
         t = t.expand(-1, -1, -1, H, W)          # [B, T, encoder_C, H, W]
-
-        print(f"{self.channel_in=}, {self.channel_hid=}, {x.shape=}, {t.shape=}")
-
         
         z = x + t
         z = z.reshape(B, T*C, H, W)
@@ -383,8 +374,6 @@ class SimVPTemporal(nn.Module):
         
         B, T, C, H, W = x.shape
         x = x.reshape(B*T, C, H, W)
-
-        print(x.shape)
 
         embed, skip = self.enc(x)
         _, C_, H_, W_ = embed.shape
